@@ -1,8 +1,9 @@
 package config;
 
+import buildable.annotation.BuiltWith;
 import buildable.config.BuildableClass;
 import buildable.config.BuildableConfig;
-import buildable.config.BuildableDefault;
+import buildable.config.BuiltOn;
 
 
 @BuildableConfig
@@ -15,9 +16,9 @@ public class BuilderConfig {
     private ExcludedFieldTestObject excludedFieldTestObject;
 
     @BuildableClass({
-            @BuildableDefault(name = "name", value = "John"),
-            @BuildableDefault(name = "age", value = "25"),
-            @BuildableDefault(name = "account", value = "new Account(\"account_id\")")
+            @BuiltOn(name = "name", value = @BuiltWith(defaultValue = "John")),
+            @BuiltOn(name = "age", value = @BuiltWith(defaultValue = "25")),
+            @BuiltOn(name = "account", value = @BuiltWith(defaultValue = "new Account(\"account_id\")"))
     })
     private DefaultTestObject defaultTestObject;
 }

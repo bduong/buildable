@@ -1,12 +1,10 @@
 package buildable.config.processor;
 
-import buildable.annotation.Buildable;
 import buildable.annotation.BuiltWith;
 import buildable.config.BuildableClass;
 import buildable.config.BuildableConfig;
-import buildable.config.BuildableDefault;
+import buildable.config.BuiltOn;
 import com.squareup.javapoet.ClassName;
-import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
@@ -26,16 +24,11 @@ import javax.lang.model.element.Name;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
-import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
-import javax.lang.model.util.Types;
-import javax.tools.JavaFileObject;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -45,7 +38,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static buildable.annotation.processor.Util.capitalize;
-import static buildable.annotation.processor.Util.createBuilderName;
 import static java.util.Arrays.asList;
 import static javax.tools.Diagnostic.Kind.NOTE;
 
@@ -83,14 +75,14 @@ public class BuildableConfigProcessor extends AbstractProcessor {
 
                     variables.removeIf(v -> !v.getKind().isField());
 
-                    Map<String, String> defaults = new HashMap<>();
+                    Map<String, BuiltWith> defaults = new HashMap<>();
 
                     BuildableClass annotation = fieldClass.getAnnotation(BuildableClass.class);
                     if (annotation != null) {
                         List<String> excludedFields = asList(annotation.excludedFields());
                         variables.removeIf(v -> excludedFields.contains(v.toString()));
 
-                        defaults = Arrays.stream(annotation.value()).collect(Collectors.toMap(BuildableDefault::name, BuildableDefault::value));
+                        defaults = Arrays.stream(annotation.value()).collect(Collectors.toMap(BuiltOn::name, BuiltOn::value));
                     }
 
 
@@ -110,7 +102,7 @@ public class BuildableConfigProcessor extends AbstractProcessor {
                                 .getSimpleName().toString(), Modifier.PRIVATE);
                         if(defaults.containsKey(variable.getSimpleName().toString())) {
                             String sub = "java.lang.String".equals(variable.asType().toString()) ? "$S" : "$L";
-                            fieldBuilder.initializer(sub, defaults.get(variable.getSimpleName().toString()));
+                            fieldBuilder.initializer(sub, defaults.get(variable.getSimpleName().toString()).defaultValue());
                         }
 
 
