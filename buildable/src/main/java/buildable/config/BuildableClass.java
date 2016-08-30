@@ -14,4 +14,6 @@ import java.util.List;
 public @interface BuildableClass {
 
     String[] excludedFields() default {};
+
+    BuildableDefault [] defaultValues() default {};
 }
