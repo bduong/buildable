@@ -30,7 +30,7 @@ project(':example') {
 
 
     compileJava {
-            options.compilerArgs = ["-processor","buildable.annotation.processor.BuildableAnnotationProcessor"]
+            options.compilerArgs = ["-processor","buildable.annotation.processor.BuildableAnnotationProcessor,buildable.config.processor.BuildableConfigProcessor"]
             classpath += configurations.annotations
     }
 
