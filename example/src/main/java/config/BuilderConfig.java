@@ -14,7 +14,7 @@ public class BuilderConfig {
     @BuildableClass(excludedFields = "ignored")
     private ExcludedFieldTestObject excludedFieldTestObject;
 
-    @BuildableClass(defaultValues = {
+    @BuildableClass({
             @BuildableDefault(name = "name", value = "John"),
             @BuildableDefault(name = "age", value = "25"),
             @BuildableDefault(name = "account", value = "new Account(\"account_id\")")

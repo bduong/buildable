@@ -6,9 +6,11 @@ import buildable.config.BuildableClass;
 import buildable.config.BuildableConfig;
 import buildable.config.BuildableDefault;
 import com.squareup.javapoet.ClassName;
+import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
+import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
@@ -27,8 +29,12 @@ import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
+import javax.tools.JavaFileObject;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -39,6 +45,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static buildable.annotation.processor.Util.capitalize;
+import static buildable.annotation.processor.Util.createBuilderName;
 import static java.util.Arrays.asList;
 import static javax.tools.Diagnostic.Kind.NOTE;
 
@@ -83,7 +90,7 @@ public class BuildableConfigProcessor extends AbstractProcessor {
                         List<String> excludedFields = asList(annotation.excludedFields());
                         variables.removeIf(v -> excludedFields.contains(v.toString()));
 
-                        defaults = Arrays.stream(annotation.defaultValues()).collect(Collectors.toMap(BuildableDefault::name, BuildableDefault::value));
+                        defaults = Arrays.stream(annotation.value()).collect(Collectors.toMap(BuildableDefault::name, BuildableDefault::value));
                     }
 
 
@@ -106,10 +113,13 @@ public class BuildableConfigProcessor extends AbstractProcessor {
                             fieldBuilder.initializer(sub, defaults.get(variable.getSimpleName().toString()));
                         }
 
+
+                        ClassName builderName = ClassName.get(className.packageName(), clazz.getSimpleName() +
+                                "Builder");
                         builder.addField(fieldBuilder.build());
                         builder.addMethod(MethodSpec.methodBuilder(determineFluentMethodName((VariableElement) variable))
                                 .addModifiers(Modifier.PUBLIC)
-                                .returns(TypeName.get(variable.asType()))
+                                .returns(builderName)
                                 .addParameter(TypeName.get(variable.asType()), variable.getSimpleName().toString())
                                 .addStatement("this.$L = $L", variable.getSimpleName().toString(), variable.getSimpleName().toString())
                                 .addStatement("return this")
@@ -117,10 +127,62 @@ public class BuildableConfigProcessor extends AbstractProcessor {
                         );
                     }
 
-                    JavaFile javaFile = JavaFile.builder(elementUtils.getPackageOf(typeMirror.asElement()).toString(), builder.build()).build();
+                    ParameterSpec classParam = ParameterSpec.builder(Class.class, "clazz").build();
+                    ParameterSpec fieldParam = ParameterSpec.builder(String.class, "fieldName").build();
+                    MethodSpec getDeclaredField = MethodSpec.methodBuilder("getDeclaredField")
+                            .addException(NoSuchFieldException.class)
+                            .addModifiers(Modifier.PRIVATE)
+                            .returns(Field.class)
+                            .addParameter(classParam).addParameter(fieldParam)
+                            .beginControlFlow("try")
+                            .addStatement("return $N.getDeclaredField($N)", classParam, fieldParam)
+                            .nextControlFlow("catch ($T e)", NoSuchFieldException.class)
+                            .addStatement("Class superclass = $N.getSuperclass();", classParam)
+                            .beginControlFlow("if (superclass == null)")
+                            .addStatement("throw e")
+                            .nextControlFlow("else")
+                            .addStatement("return getDeclaredField(superclass, $N)", fieldParam)
+                            .endControlFlow()
+                            .endControlFlow()
+                            .build();
+
+
+                    MethodSpec.Builder build = MethodSpec.methodBuilder("build").returns(className).addModifiers(Modifier.PUBLIC);
+                    build.beginControlFlow("try")
+                            .addStatement("final $T clazz = $T.forName($T.class.getCanonicalName())", Class.class, Class.class, className)
+                            .addStatement("final $T instance = ($T) clazz.newInstance()", className, className);
+
+                    for (Element variable : variables) {
+                        String methodName = variable.getSimpleName().toString() + "Method";
+                        String fieldName = variable.getSimpleName().toString() + "Field";
+                        build
+                                .beginControlFlow("try")
+                                .addStatement("final $T $L = clazz.getDeclaredMethod($S, $T.class)", Method.class, methodName, "set" + capitalize(variable.getSimpleName()), variable.asType())
+                                .addStatement("$L.setAccessible(true)", methodName)
+                                .addStatement("$L.invoke(instance, $L)", methodName, variable.getSimpleName().toString())
+                                .nextControlFlow("catch ($T nsme)", NoSuchMethodException.class)
+                                .addStatement("final $T $L = $N(clazz, $S)", Field.class, fieldName, getDeclaredField, variable.getSimpleName().toString())
+                                .addStatement("$L.setAccessible(true)", fieldName)
+                                .addStatement("$L.set(instance, $L)", fieldName, variable.getSimpleName().toString())
+                                .addStatement("$L.setAccessible(false)", fieldName)
+                                .endControlFlow();
+                    }
+                    build.addStatement("return instance")
+                            .nextControlFlow("catch ($T | $T e)", Exception.class, Error.class)
+                            .addStatement("e.printStackTrace()")
+                            .endControlFlow()
+                            .addStatement("return null");
+
+
+
+                    builder.addMethod(build.build());
+                    builder.addMethod(getDeclaredField);
+
+                    TypeSpec builderClass = builder.build();
+                    JavaFile javaFile = JavaFile.builder(elementUtils.getPackageOf(typeMirror.asElement()).toString(), builderClass).indent("\t").build();
 
                     try {
-                        javaFile.writeTo(System.out);
+                        javaFile.writeTo(processingEnv.getFiler());
                     } catch (IOException e) {
                         e.printStackTrace();
                     }

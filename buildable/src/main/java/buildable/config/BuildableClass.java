@@ -15,5 +15,5 @@ public @interface BuildableClass {
 
     String[] excludedFields() default {};
 
-    BuildableDefault [] defaultValues() default {};
+    BuildableDefault [] value() default {};
 }
