@@ -15,7 +15,6 @@ import javax.lang.model.element.Modifier;
 import javax.lang.model.element.Name;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
-import javax.tools.JavaFileObject;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -70,15 +69,14 @@ public class BuildableAnnotationProcessor extends AbstractProcessor {
             final String builderName = createBuilderName(theBuildable, simpleClassName);
 
             try {
-                final JavaFileObject javaFileObject =
-                        processingEnv.getFiler().createSourceFile(packageName + "." +
-                        createBuilderName(theBuildable, simpleClassName), eachBuildableClass);
+//                final JavaFileObject javaFileObject =
+//                        processingEnv.getFiler().createSourceFile(packageName + "." +
+//                        createBuilderName(theBuildable, simpleClassName), eachBuildableClass);
 
-                final ClassFileWriter writer = new ClassFileWriter(theBuildable, javaFileObject);
+                final ClassFileWriter writer = new ClassFileWriter(theBuildable);
 
-                writer.writePackageAndImports(qualifiedClassName);
-                writer.writeClassDeclaration(simpleClassName);
-                writer.writeFactoryMethodAndConstructor(simpleClassName);
+                writer.writeClassDeclaration(eachBuildableTypeElement);
+                writer.writeFactoryMethodAndConstructor(qualifiedClassName, simpleClassName);
 
                 if (!theBuildable.cloneMethod().isEmpty()) {
                     writer.writeCloneableMethod(simpleClassName, buildableFieldsMap.get(eachBuildableTypeElement));
@@ -90,14 +88,13 @@ public class BuildableAnnotationProcessor extends AbstractProcessor {
 
                     writer.writeFluentElement(
                             eachFieldToBuild,
-                            builderName,
                             buildables,
                             hasBuiltWithSpecifications ?
                                     determineFieldDefaultValue(eachFieldToBuild, annotation, builderName) : "");
                 }
 
-                writer.writeBuildMethod(buildableFieldsMap.get(eachBuildableTypeElement), simpleClassName);
-                writer.finishClass();
+                writer.writeBuildMethod(buildableFieldsMap.get(eachBuildableTypeElement), eachBuildableTypeElement.asType());
+                writer.finishClass(qualifiedClassName, processingEnv.getFiler());
 
             } catch (Exception e) {
                 this.processingEnv.getMessager().printMessage(

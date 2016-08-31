@@ -16,6 +16,7 @@ artifacts {
 
 dependencies{
     compile 'com.squareup:javapoet:1.7.0'
+    compile group: 'org.apache.commons', name: 'commons-lang3', version: '3.4'
 }
 
 //signing {
