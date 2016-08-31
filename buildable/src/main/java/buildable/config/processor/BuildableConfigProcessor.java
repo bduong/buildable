@@ -1,11 +1,10 @@
 package buildable.config.processor;
 
 import buildable.annotation.BuiltWith;
-import buildable.config.InjectBuildable;
-import buildable.config.BuildableSpec;
 import buildable.config.BuildField;
+import buildable.config.BuildableSpec;
+import buildable.config.InjectBuildable;
 import com.squareup.javapoet.ClassName;
-import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterSpec;
@@ -42,10 +41,11 @@ import static java.util.Arrays.asList;
 import static javax.tools.Diagnostic.Kind.NOTE;
 
 @SupportedAnnotationTypes(value = {
-        "buildable.config.BuildableConfig",
-        "buildable.config.BuildableClass"
+        "buildable.config.BuildableSpec",
+        "buildable.config.InjectBuildable",
+        "buildable.config.BuildField"
 })
-@SupportedSourceVersion(SourceVersion.RELEASE_7)
+@SupportedSourceVersion(SourceVersion.RELEASE_8)
 @SuppressWarnings("UnusedDeclaration")
 public class BuildableConfigProcessor extends AbstractProcessor {
 
@@ -71,23 +71,25 @@ public class BuildableConfigProcessor extends AbstractProcessor {
                     DeclaredType typeMirror = (DeclaredType) fieldClass.asType();
                     TypeElement clazz = (TypeElement) typeMirror.asElement();
                     //fields of the class
-                    List<? extends Element> variables = new ArrayList<>(clazz.getEnclosedElements());
+                    List<VariableElement> fields = new ArrayList<>(clazz.getEnclosedElements()).stream().filter(v -> v.getKind().isField()).map(v -> ((VariableElement) v)).collect(Collectors.toList());
 
-                    variables.removeIf(v -> !v.getKind().isField());
+//                    fields.removeIf(v -> !v.getKind().isField());
 
-                    Map<String, BuiltWith> defaults = new HashMap<>();
+                    Map<String, BuiltWith> fieldBuilders = new HashMap<>();
 
                     InjectBuildable annotation = fieldClass.getAnnotation(InjectBuildable.class);
                     if (annotation != null) {
                         List<String> excludedFields = asList(annotation.excludedFields());
-                        variables.removeIf(v -> excludedFields.contains(v.toString()));
+                        fields.removeIf(v -> excludedFields.contains(v.toString()));
 
-                        defaults = Arrays.stream(annotation.value()).collect(Collectors.toMap(BuildField::name, BuildField::value));
+                        fieldBuilders = Arrays.stream(annotation.value()).collect(Collectors.toMap(BuildField::name, BuildField::value));
                     }
 
 
                     ClassName className = ClassName.get(clazz);
-                    TypeSpec.Builder builder = TypeSpec.classBuilder(clazz.getSimpleName() + "Builder")
+                    ClassName builderName = ClassName.get(className.packageName(), className.simpleName() + "Builder");
+
+                    TypeSpec.Builder builder = TypeSpec.classBuilder(builderName)
                             .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
                             .addMethod(MethodSpec.constructorBuilder().addModifiers(Modifier.PRIVATE).build())
                             .addMethod(MethodSpec.methodBuilder(createFactoryMethodName(clazz.getSimpleName()))
@@ -97,26 +99,14 @@ public class BuildableConfigProcessor extends AbstractProcessor {
                                     .build()
                             );
 
-                    for (Element variable : variables) {
-                        FieldSpec.Builder fieldBuilder = FieldSpec.builder(TypeName.get(variable.asType()), variable
-                                .getSimpleName().toString(), Modifier.PRIVATE);
-                        if(defaults.containsKey(variable.getSimpleName().toString())) {
-                            String sub = "java.lang.String".equals(variable.asType().toString()) ? "$S" : "$L";
-                            fieldBuilder.initializer(sub, defaults.get(variable.getSimpleName().toString()).defaultValue());
-                        }
+                    for (VariableElement buildableField : fields) {
+                        String fieldName = buildableField.getSimpleName().toString();
+                        BuiltWith builtWith = fieldBuilders.containsKey(fieldName) ? fieldBuilders.get(fieldName) : null;
+//                        ClassName fieldClass = ClassName.get(buildableField.asType());
 
+                        TypeName fieldClassName = TypeName.get(buildableField.asType());
 
-                        ClassName builderName = ClassName.get(className.packageName(), clazz.getSimpleName() +
-                                "Builder");
-                        builder.addField(fieldBuilder.build());
-                        builder.addMethod(MethodSpec.methodBuilder(determineFluentMethodName((VariableElement) variable))
-                                .addModifiers(Modifier.PUBLIC)
-                                .returns(builderName)
-                                .addParameter(TypeName.get(variable.asType()), variable.getSimpleName().toString())
-                                .addStatement("this.$L = $L", variable.getSimpleName().toString(), variable.getSimpleName().toString())
-                                .addStatement("return this")
-                                .build()
-                        );
+                        ClassWriterUtil.buildFieldMethod(builder, buildableField, fieldName, builtWith, fieldClassName, builderName);
                     }
 
                     ParameterSpec classParam = ParameterSpec.builder(Class.class, "clazz").build();
@@ -144,7 +134,7 @@ public class BuildableConfigProcessor extends AbstractProcessor {
                             .addStatement("final $T clazz = $T.forName($T.class.getCanonicalName())", Class.class, Class.class, className)
                             .addStatement("final $T instance = ($T) clazz.newInstance()", className, className);
 
-                    for (Element variable : variables) {
+                    for (Element variable : fields) {
                         String methodName = variable.getSimpleName().toString() + "Method";
                         String fieldName = variable.getSimpleName().toString() + "Field";
                         build
@@ -195,7 +185,4 @@ public class BuildableConfigProcessor extends AbstractProcessor {
         }
     }
 
-    private String determineFluentMethodName(final VariableElement field) {
-        return "with" + capitalize(field.getSimpleName());
-    }
 }
