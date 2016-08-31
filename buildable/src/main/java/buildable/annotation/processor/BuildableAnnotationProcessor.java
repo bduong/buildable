@@ -23,7 +23,6 @@ import java.util.Map;
 import java.util.Set;
 
 import static buildable.annotation.processor.Util.createBuilderName;
-import static buildable.annotation.processor.Util.packageNameOf;
 import static java.lang.String.format;
 import static javax.tools.Diagnostic.Kind.ERROR;
 import static javax.tools.Diagnostic.Kind.NOTE;
@@ -63,23 +62,19 @@ public class BuildableAnnotationProcessor extends AbstractProcessor {
 
             Name simpleClassName = eachBuildableTypeElement.getSimpleName();
             Name qualifiedClassName = eachBuildableTypeElement.getQualifiedName();
-            String packageName = packageNameOf(qualifiedClassName);
 
             final Buildable theBuildable = eachBuildableTypeElement.getAnnotation(Buildable.class);
             final String builderName = createBuilderName(theBuildable, simpleClassName);
 
             try {
-//                final JavaFileObject javaFileObject =
-//                        processingEnv.getFiler().createSourceFile(packageName + "." +
-//                        createBuilderName(theBuildable, simpleClassName), eachBuildableClass);
 
-                final ClassFileWriter writer = new ClassFileWriter(theBuildable);
+                final ClassFileWriter writer = new ClassFileWriter(theBuildable, qualifiedClassName);
 
-                writer.writeClassDeclaration(eachBuildableTypeElement);
-                writer.writeFactoryMethodAndConstructor(qualifiedClassName, simpleClassName);
+                writer.writeClassDeclaration();
+                writer.writeFactoryMethodAndConstructor();
 
                 if (!theBuildable.cloneMethod().isEmpty()) {
-                    writer.writeCloneableMethod(simpleClassName, buildableFieldsMap.get(eachBuildableTypeElement));
+                    writer.writeCloneableMethod(buildableFieldsMap.get(eachBuildableTypeElement));
                 }
 
                 for (VariableElement eachFieldToBuild : buildableFieldsMap.get(eachBuildableTypeElement)) {
@@ -88,13 +83,14 @@ public class BuildableAnnotationProcessor extends AbstractProcessor {
 
                     writer.writeFluentElement(
                             eachFieldToBuild,
+                            annotation,
                             buildables,
                             hasBuiltWithSpecifications ?
                                     determineFieldDefaultValue(eachFieldToBuild, annotation, builderName) : "");
                 }
 
-                writer.writeBuildMethod(buildableFieldsMap.get(eachBuildableTypeElement), eachBuildableTypeElement.asType());
-                writer.finishClass(qualifiedClassName, processingEnv.getFiler());
+                writer.writeBuildMethod(buildableFieldsMap.get(eachBuildableTypeElement));
+                writer.finishClass(processingEnv.getFiler());
 
             } catch (Exception e) {
                 this.processingEnv.getMessager().printMessage(
