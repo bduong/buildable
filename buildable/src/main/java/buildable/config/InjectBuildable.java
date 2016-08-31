@@ -7,7 +7,11 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 @Documented
-@Target({ElementType.TYPE})
+@Target({ElementType.FIELD})
 @Retention(RetentionPolicy.SOURCE)
-public @interface BuildableConfig {
+public @interface InjectBuildable {
+
+    String[] excludedFields() default {};
+
+    BuildField[] value() default {};
 }

@@ -1,9 +1,9 @@
 package buildable.config.processor;
 
 import buildable.annotation.BuiltWith;
-import buildable.config.BuildableClass;
-import buildable.config.BuildableConfig;
-import buildable.config.BuiltOn;
+import buildable.config.InjectBuildable;
+import buildable.config.BuildableSpec;
+import buildable.config.BuildField;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.JavaFile;
@@ -55,7 +55,7 @@ public class BuildableConfigProcessor extends AbstractProcessor {
         if (roundEnvironment.processingOver()) {
             return true;
         }
-        final Set<? extends Element> config = roundEnvironment.getElementsAnnotatedWith(BuildableConfig.class);
+        final Set<? extends Element> config = roundEnvironment.getElementsAnnotatedWith(BuildableSpec.class);
         if (config.size() == 0) {
             return true;
         }
@@ -77,12 +77,12 @@ public class BuildableConfigProcessor extends AbstractProcessor {
 
                     Map<String, BuiltWith> defaults = new HashMap<>();
 
-                    BuildableClass annotation = fieldClass.getAnnotation(BuildableClass.class);
+                    InjectBuildable annotation = fieldClass.getAnnotation(InjectBuildable.class);
                     if (annotation != null) {
                         List<String> excludedFields = asList(annotation.excludedFields());
                         variables.removeIf(v -> excludedFields.contains(v.toString()));
 
-                        defaults = Arrays.stream(annotation.value()).collect(Collectors.toMap(BuiltOn::name, BuiltOn::value));
+                        defaults = Arrays.stream(annotation.value()).collect(Collectors.toMap(BuildField::name, BuildField::value));
                     }
 
 
