@@ -11,6 +11,7 @@ import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
@@ -145,7 +146,12 @@ public class BuildableSpecProcessor extends AbstractProcessor {
     }
 
     private Map<String, VariableElement> determineFieldsToBuild(TypeElement clazz, List<String> excludedFields) {
-        Map<String, VariableElement> fields = clazz.getEnclosedElements().stream().filter(v -> v.getKind().isField()).map(v -> ((VariableElement) v)).collect(Collectors.toMap(f -> f.getSimpleName().toString(), f -> f));
+        Map<String, VariableElement> fields = clazz.getEnclosedElements()
+                .stream()
+                .filter(v -> v.getKind().isField())
+                .filter(v -> !v.getModifiers().contains(Modifier.STATIC))
+                .map(v -> ((VariableElement) v))
+                .collect(Collectors.toMap(f -> f.getSimpleName().toString(), f -> f));
         fields.entrySet().removeIf(e -> excludedFields.contains(e.getKey()));
 
         if (clazz.asType().getKind().isPrimitive()) {
