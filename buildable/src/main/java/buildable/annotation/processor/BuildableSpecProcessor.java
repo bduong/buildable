@@ -2,11 +2,7 @@ package buildable.annotation.processor;
 
 import buildable.annotation.Buildable;
 import buildable.annotation.BuiltWith;
-import buildable.spec.BuildConstructor;
-import buildable.spec.BuildField;
-import buildable.spec.BuildableSpec;
-import buildable.spec.ConstructorArg;
-import buildable.spec.InjectBuildable;
+import buildable.spec.*;
 import com.squareup.javapoet.ClassName;
 
 import javax.annotation.processing.AbstractProcessor;
@@ -19,14 +15,8 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
-
 import java.lang.annotation.Annotation;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static buildable.annotation.processor.Util.defaultBuildable;
@@ -115,7 +105,7 @@ public class BuildableSpecProcessor extends AbstractProcessor {
                 Buildable theBuildable = injectBuildable.value();
 
                 try {
-                    ClassFileWriter classWriter = new ClassFileWriter(theBuildable, classToBuild.getQualifiedName());
+                    ClassFileWriter classWriter = new ClassFileWriter(theBuildable, classToBuild.getQualifiedName(), processingEnv.getTypeUtils());
                     classWriter.writeClassDeclaration();
                     classWriter.writeFactoryMethodAndConstructor();
 

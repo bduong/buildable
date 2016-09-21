@@ -5,45 +5,28 @@
  */
 package buildable.annotation.processor;
 
-import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
+import buildable.Builder;
+import buildable.annotation.Buildable;
+import buildable.annotation.BuiltWith;
+import buildable.spec.ConstructorArg;
+import com.squareup.javapoet.*;
 
 import javax.annotation.processing.Filer;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.Name;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.MirroredTypeException;
 import javax.lang.model.type.TypeMirror;
+import javax.lang.model.util.Types;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.*;
 
-import buildable.spec.BuildConstructor;
-import buildable.spec.ConstructorArg;
-import com.squareup.javapoet.ArrayTypeName;
-import com.squareup.javapoet.ClassName;
-import com.squareup.javapoet.FieldSpec;
-import com.squareup.javapoet.JavaFile;
-import com.squareup.javapoet.MethodSpec;
-import com.squareup.javapoet.ParameterSpec;
-import com.squareup.javapoet.ParameterizedTypeName;
-import com.squareup.javapoet.TypeName;
-import com.squareup.javapoet.TypeSpec;
-
-import buildable.Builder;
-import buildable.annotation.Buildable;
-import buildable.annotation.BuiltWith;
-
-import static buildable.annotation.processor.Util.capitalize;
-import static buildable.annotation.processor.Util.createBuilderName;
-import static buildable.annotation.processor.Util.packageNameOf;
+import static buildable.annotation.processor.Util.*;
 import static java.util.Arrays.asList;
 
 /**
@@ -57,12 +40,14 @@ public class ClassFileWriter {
     private ClassName builderClass;
     private ClassName builtClass;
     private String packageName;
+    private Types typeUtil;
 
-    public ClassFileWriter(Buildable theBuildable, Name qualifiedClassName) throws IOException {
+    public ClassFileWriter(Buildable theBuildable, Name qualifiedClassName, Types typeUtil) throws IOException {
         this.theBuildable = theBuildable;
         this.packageName = packageNameFromQualifiedName(qualifiedClassName);
         this.builtClass = ClassName.get(packageName, classNameFromQualifiedName(qualifiedClassName));
         this.builderClass = ClassName.get(packageName, createBuilderName(theBuildable, classNameFromQualifiedName(qualifiedClassName)));
+        this.typeUtil = typeUtil;
     }
 
 
@@ -95,11 +80,11 @@ public class ClassFileWriter {
     public void writeFluentElement(ConstructorArg arg, Map<TypeElement, Buildable> buildables) throws Exception {
         BuiltWith annotation = arg.value();
         TypeName className;
-        TypeMirror fieldType = null;
+        DeclaredType fieldType = null;
         try {
             className = ClassName.get(arg.type());
         } catch (MirroredTypeException mte) {
-            fieldType = mte.getTypeMirror();
+            fieldType = (DeclaredType) mte.getTypeMirror();
             className = ClassName.get(fieldType);
         }
 
@@ -173,7 +158,7 @@ public class ClassFileWriter {
      * the fluent built-with method to also accept its builder as a parameter
      */
     private void writeMethodForFieldBuilderIfExists(String fieldName, TypeMirror fieldType, Map<TypeElement, Buildable> buildables, String methodName) {
-        Optional<TypeElement> buildableVariable = buildables.keySet().stream().filter(eachBuildable -> eachBuildable.asType().equals(fieldType)).findFirst();
+        Optional<TypeElement> buildableVariable = buildables.keySet().stream().filter(eachBuildable -> typeUtil.isSameType(eachBuildable.asType(), fieldType)).findFirst();
 
         if (buildableVariable.isPresent()) {
             TypeElement variableClassElement = buildableVariable.get();

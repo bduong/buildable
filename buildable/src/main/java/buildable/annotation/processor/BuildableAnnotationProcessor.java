@@ -10,17 +10,8 @@ import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.Modifier;
-import javax.lang.model.element.Name;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.element.VariableElement;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import javax.lang.model.element.*;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static buildable.annotation.processor.Util.createBuilderName;
@@ -79,7 +70,7 @@ public class BuildableAnnotationProcessor extends AbstractProcessor {
 
             try {
 
-                final ClassFileWriter writer = new ClassFileWriter(theBuildable, qualifiedClassName);
+                final ClassFileWriter writer = new ClassFileWriter(theBuildable, qualifiedClassName, processingEnv.getTypeUtils());
 
                 writer.writeClassDeclaration();
                 writer.writeFactoryMethodAndConstructor();
