@@ -114,20 +114,20 @@ public class ClassFileWriter {
     private void writeSetter(String fieldName, TypeMirror fieldType, BuiltWith annotation, boolean hasBuiltWithSpecifications, TypeName fieldClassName, String methodName) {
         MethodSpec.Builder fieldMethod = MethodSpec.methodBuilder(methodName).addModifiers(Modifier.PUBLIC).returns(builderClass);
 
-        if (hasBuiltWithSpecifications && annotation.overrideMethod() == BuiltWith.OverrideMethod.AddToList) {
+        if (hasBuiltWithSpecifications && annotation.overrideMethod() != BuiltWith.OverrideMethod.NULL) {
             TypeName innerClass = ((ParameterizedTypeName) ParameterizedTypeName.get(fieldType)).typeArguments.get(0);
             fieldMethod.addParameter(ArrayTypeName.of(innerClass), fieldName);
 
-            TypeName listImpl;
+            TypeName colImpl;
             if (BuiltWith.USE_SENSIBLE_DEFAULT.equals(annotation.overrideClassifer())) {
-                listImpl = ParameterizedTypeName.get(ClassName.get(ArrayList.class), ((ParameterizedTypeName) ParameterizedTypeName.get(fieldType)).typeArguments.get(0));
+                Class collectionClass = annotation.overrideMethod() == BuiltWith.OverrideMethod.AddToList ? ArrayList.class : HashSet.class;
+                colImpl = ParameterizedTypeName.get(ClassName.get(collectionClass), ((ParameterizedTypeName) ParameterizedTypeName.get(fieldType)).typeArguments.get(0));
             } else {
-                listImpl = ClassName.get(packageNameFromQualifiedName(annotation.overrideClassifer()), classNameFromQualifiedName(annotation.overrideClassifer()));
+                colImpl = ClassName.get(packageNameFromQualifiedName(annotation.overrideClassifer()), classNameFromQualifiedName(annotation.overrideClassifer()));
             }
-            fieldMethod.addStatement("this.$L = new $T()", fieldName, listImpl);
+            fieldMethod.addStatement("this.$L = new $T()", fieldName, colImpl);
             fieldMethod.addStatement("$T.addAll(this.$L, $L)", Collections.class, fieldName, fieldName);
             fieldMethod.varargs();
-
         } else {
             // write the fluent built-with method that takes in the instance of the field
             fieldMethod.addParameter(fieldClassName, fieldName);

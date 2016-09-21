@@ -78,7 +78,7 @@ public @interface BuiltWith {
     OverrideMethod overrideMethod() default OverrideMethod.NULL;
 
     enum OverrideMethod {
-        NULL, AddToList
+        NULL, AddToList, AddToSet
     }
 
 
